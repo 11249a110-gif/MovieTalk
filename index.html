@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MovieTalk - Hollywood Movie Recommendation System</title>
+  <meta name="description" content="Discover 1,000 iconic Hollywood movies with real poster images, search, and smart recommendations. Presented by Balaji Shankar and Sai Kumar.">
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Navbar / Header -->
+  <header class="app-header">
+    <div class="header-container">
+      
+      <!-- Brand Logo -->
+      <div class="brand" id="brandLogo">
+        <img src="logo.jpg" alt="MovieTalk MT Logo" class="brand-logo-img">
+        <div class="brand-text">
+          <span class="brand-name">Movie<span class="brand-highlight">Talk</span></span>
+          <span class="brand-tagline">1,000 Hollywood Classics</span>
+        </div>
+      </div>
+
+      <!-- Central Search Bar -->
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Search movie title, director, year, or genre... (e.g. Interstellar, Nolan)" autocomplete="off">
+        <button id="clearSearchBtn" class="clear-btn" title="Clear Search" hidden>
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <span class="keyboard-shortcut">Press /</span>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="header-actions">
+        <button id="homeNavBtn" class="btn-secondary active-nav-btn">
+          <i class="fa-solid fa-house"></i> Home Catalog
+        </button>
+        <button id="watchlistNavBtn" class="btn-secondary">
+          <i class="fa-solid fa-bookmark"></i> Watchlist <span id="watchlistCountBadge" class="badge">0</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- VIEW 1: MAIN BROWSE CATALOG & SEARCH VIEW -->
+  <div id="catalogView" class="view-page">
+    
+    <!-- Hero Banner -->
+    <section class="hero-banner">
+      <div class="hero-content">
+        <div class="hero-badge"><i class="fa-solid fa-clapperboard"></i> MovieTalk Recommendation System • Presented by Balaji & Sai</div>
+        <h1 class="hero-title">Discover 1,000 Iconic Hollywood Movies</h1>
+        <p class="hero-description">
+          Explore real poster artwork, in-depth film reviews by Balaji Shankar & Sai Kumar, box office revenues, and personalized recommendations across 1,000 Hollywood classics. Click any movie to enter the full-screen cinematic stage!
+        </p>
+      </div>
+    </section>
+
+    <!-- Main Workspace Layout -->
+    <main class="main-container">
+
+      <!-- Filter Bar & Collections -->
+      <section class="filter-section">
+
+        <!-- Preset Collections Pills -->
+        <div class="collection-pills">
+          <button class="collection-pill active" data-filter="all">
+            <i class="fa-solid fa-film"></i> All 1,000 Movies
+          </button>
+          <button class="collection-pill" data-filter="top-rated">
+            <i class="fa-solid fa-star"></i> Top Rated (8.0+)
+          </button>
+          <button class="collection-pill" data-filter="blockbuster">
+            <i class="fa-solid fa-sack-dollar"></i> Blockbusters ($200M+)
+          </button>
+          <button class="collection-pill" data-filter="fan-favorite">
+            <i class="fa-solid fa-thumbs-up"></i> Fan Favorites (300k+ Votes)
+          </button>
+          <button class="collection-pill" data-filter="watchlist">
+            <i class="fa-solid fa-bookmark"></i> My Watchlist
+          </button>
+        </div>
+
+        <!-- Genre Pills Bar -->
+        <div class="genre-pills-wrapper">
+          <div class="genre-pills" id="genrePills">
+            <button class="genre-pill active" data-genre="ALL">All Genres</button>
+            <button class="genre-pill" data-genre="Action">🔥 Action</button>
+            <button class="genre-pill" data-genre="Adventure">🧭 Adventure</button>
+            <button class="genre-pill" data-genre="Animation">🎨 Animation</button>
+            <button class="genre-pill" data-genre="Biography">📜 Biography</button>
+            <button class="genre-pill" data-genre="Comedy">😂 Comedy</button>
+            <button class="genre-pill" data-genre="Crime">🕵️ Crime</button>
+            <button class="genre-pill" data-genre="Drama">🎭 Drama</button>
+            <button class="genre-pill" data-genre="Horror">👻 Horror</button>
+            <button class="genre-pill" data-genre="Mystery">🔍 Mystery</button>
+            <button class="genre-pill" data-genre="Romance">💖 Romance</button>
+            <button class="genre-pill" data-genre="Sci-Fi">🚀 Sci-Fi</button>
+            <button class="genre-pill" data-genre="Thriller">⚡ Thriller</button>
+            <button class="genre-pill" data-genre="Fantasy">🔮 Fantasy</button>
+          </div>
+        </div>
+
+        <!-- Active Filter Status & Sorting Row -->
+        <div class="results-meta-row">
+          <div class="results-info">
+            Showing <span id="resultsCount">1,000</span> movies
+            <span id="activeFilterTag" class="active-filter-tag" hidden></span>
+          </div>
+
+          <div class="sort-controls">
+            <label for="sortBySelect"><i class="fa-solid fa-arrow-down-short-wide"></i> Sort By:</label>
+            <select id="sortBySelect">
+              <option value="rating-desc">Rating: High to Low</option>
+              <option value="votes-desc">Popularity (Most Voted)</option>
+              <option value="revenue-desc">Box Office Collection</option>
+              <option value="year-desc">Latest Release Year</option>
+              <option value="title-asc">Title: A to Z</option>
+            </select>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Movie Cards Grid -->
+      <section class="movie-grid" id="movieGrid">
+        <!-- Dynamic Movie Cards with Images Render Here -->
+      </section>
+
+      <!-- Empty State / No Results -->
+      <div id="noResultsState" class="empty-state" hidden>
+        <i class="fa-solid fa-clapperboard empty-icon"></i>
+        <h3>No Movies Found</h3>
+        <p>Try searching for a different movie title, director, or select a genre tab above.</p>
+        <button id="resetSearchBtn" class="btn-secondary">Reset Search & Filters</button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- VIEW 2: DEDICATED FRESH MOVIE DETAIL PAGE -->
+  <div id="detailViewPage" class="view-page" hidden>
+    <div class="detail-page-wrapper">
+
+      <!-- Back Navigation Header -->
+      <div class="detail-nav-bar">
+        <button id="backToCatalogBtn" class="btn-secondary">
+          <i class="fa-solid fa-arrow-left"></i> Back to Movie Catalog
+        </button>
+        <span class="detail-page-title-badge" id="detailBreadcrumb">Movie Details</span>
+      </div>
+
+      <!-- Fresh Movie Detail Showcase -->
+      <div id="detailShowcase" class="detail-showcase-container">
+        <!-- Dynamic Fresh Movie Details Rendered by app.js -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Dedicated Presentation Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="logo.jpg" alt="MT Logo" class="footer-logo">
+        <span class="footer-title">MovieTalk Recommendation System</span>
+      </div>
+
+      <p class="footer-description">
+        Powered by advanced movie matching algorithms, instant dataset search, and dynamic real poster artwork across 1,000 iconic Hollywood movies.
+      </p>
+
+      <!-- Mandatory Prominent Presentation Credits -->
+      <div class="presentation-credits">
+        <i class="fa-solid fa-award credits-icon"></i>
+        <span>Presented by <strong>Balaji Shankar</strong> and <strong>Sai Kumar</strong></span>
+      </div>
+
+      <div class="footer-copyright">
+        &copy; 2026 MovieTalk Inc. All rights reserved. First Edition Hollywood Recommendation Platform.
+      </div>
+    </div>
+  </footer>
+
+  <!-- TRAILER MODAL -->
+  <div id="trailerModal" class="modal-overlay" hidden>
+    <div class="modal-content">
+      <button id="closeTrailerBtn" class="modal-close-btn">&times;</button>
+      <div class="video-container">
+        <iframe id="trailerIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Scripts -->
+  <script src="moviesData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
