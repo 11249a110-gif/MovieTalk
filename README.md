@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🎬 MovieTalk - Hollywood Movie Recommendation System
 
 Discover 1,000 iconic Hollywood movies with real TMDB poster artwork, embedded YouTube trailers, interactive 3D parallax detail showcases, box office metrics, and exclusive editorial reviews presented by **Balaji Shankar** and **Sai Kumar**.
@@ -30,3 +31,6 @@ Discover 1,000 iconic Hollywood movies with real TMDB poster artwork, embedded Y
 
 Presented by **Balaji Shankar** and **Sai Kumar**.
 © 2026 MovieTalk Inc. All rights reserved.
+=======
+# MovieTalk
+>>>>>>> b1dcb31b42edfa39a41c3662436d1a6b3e385dcf
