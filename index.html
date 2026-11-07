@@ -37,6 +37,8 @@
           <i class="fa-solid fa-xmark"></i>
         </button>
         <span class="keyboard-shortcut">Press /</span>
+        <!-- Search Autocomplete Dropdown -->
+        <div id="searchDropdown" class="search-dropdown" hidden></div>
       </div>
 
       <!-- Quick Action Buttons -->
@@ -198,6 +200,16 @@
       <button id="closeTrailerBtn" class="modal-close-btn">&times;</button>
       <div class="video-container">
         <iframe id="trailerIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- WATCH IT ON STREAMING MODAL -->
+  <div id="watchModal" class="modal-overlay" hidden>
+    <div class="watch-modal-container">
+      <button id="closeWatchModalBtn" class="modal-close-btn" title="Close">&times;</button>
+      <div id="watchModalContent">
+        <!-- Dynamically rendered by app.js -->
       </div>
     </div>
   </div>

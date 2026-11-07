@@ -28,17 +28,105 @@ document.getElementById('backToCatalogBtn').addEventListener('click', () => {
   detailViewPage.hidden = true;
 });
 
-// Search functionality
+// Search Dropdown
+const searchDropdown = document.getElementById('searchDropdown');
+
+// Search functionality with autocomplete dropdown
 searchInput.addEventListener('input', (e) => {
   searchQuery = e.target.value.toLowerCase();
   clearSearchBtn.hidden = searchQuery.length === 0;
+  showSearchDropdown(searchQuery);
   applyFiltersAndRender();
 });
+
+searchInput.addEventListener('focus', () => {
+  if (searchQuery.length > 0) {
+    showSearchDropdown(searchQuery);
+  }
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-box')) {
+    searchDropdown.hidden = true;
+  }
+});
+
+function showSearchDropdown(query) {
+  if (!query || query.length < 1) {
+    searchDropdown.hidden = true;
+    return;
+  }
+
+  const matches = moviesData.filter(m =>
+    m.title.toLowerCase().includes(query) ||
+    m.director.toLowerCase().includes(query) ||
+    m.year.toString().includes(query) ||
+    m.genre.some(g => g.toLowerCase().includes(query))
+  ).slice(0, 8);
+
+  if (matches.length === 0) {
+    searchDropdown.innerHTML = `
+      <div class="search-dropdown-empty">
+        <i class="fa-solid fa-search"></i> No movies found for "<strong>${query}</strong>"
+      </div>
+    `;
+    searchDropdown.hidden = false;
+    return;
+  }
+
+  searchDropdown.innerHTML = `
+    <div class="search-dropdown-header">
+      <span><i class="fa-solid fa-magnifying-glass"></i> Results for "<strong>${query}</strong>"</span>
+      <span class="search-dropdown-count">${matches.length}${matches.length === 8 ? '+' : ''} found</span>
+    </div>
+    ${matches.map(m => `
+      <div class="search-dropdown-item" data-movie-id="${m.id}">
+        <img src="${m.poster}" alt="${m.title}" class="search-dropdown-poster" loading="lazy">
+        <div class="search-dropdown-info">
+          <div class="search-dropdown-title">${highlightMatch(m.title, query)}</div>
+          <div class="search-dropdown-meta">
+            <span>${m.year}</span>
+            <span>•</span>
+            <span>${m.genre.join(', ')}</span>
+            <span>•</span>
+            <span class="search-dropdown-rating"><i class="fa-solid fa-star"></i> ${m.rating}</span>
+          </div>
+          <div class="search-dropdown-director">${m.director}</div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+
+  // Add click handlers
+  searchDropdown.querySelectorAll('.search-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const movieId = parseInt(item.dataset.movieId);
+      const movie = moviesData.find(m => m.id === movieId);
+      if (movie) {
+        searchDropdown.hidden = true;
+        openMovieDetail(movie);
+      }
+    });
+  });
+
+  searchDropdown.hidden = false;
+}
+
+function highlightMatch(text, query) {
+  const idx = text.toLowerCase().indexOf(query);
+  if (idx === -1) return text;
+  const before = text.substring(0, idx);
+  const match = text.substring(idx, idx + query.length);
+  const after = text.substring(idx + query.length);
+  return `${before}<mark class="search-highlight">${match}</mark>${after}`;
+}
 
 clearSearchBtn.addEventListener('click', () => {
   searchInput.value = '';
   searchQuery = '';
   clearSearchBtn.hidden = true;
+  searchDropdown.hidden = true;
   applyFiltersAndRender();
 });
 
@@ -48,6 +136,7 @@ document.getElementById('resetSearchBtn').addEventListener('click', () => {
   searchQuery = '';
   activeFilter = 'all';
   activeGenre = 'ALL';
+  searchDropdown.hidden = true;
   
   document.querySelectorAll('.collection-pill').forEach(p => p.classList.remove('active'));
   document.querySelector('.collection-pill[data-filter="all"]').classList.add('active');
@@ -260,6 +349,218 @@ function generateSaiReview(movie) {
   };
 }
 
+// Streaming platform availability engine
+// Assigns platforms based on movie properties (director patterns, genre, year, revenue, etc.)
+const STREAMING_PLATFORMS = {
+  netflix: {
+    id: 'netflix',
+    name: 'Netflix',
+    type: 'subscription',
+    typeLabel: 'Subscription',
+    icon: 'fa-solid fa-n',
+    color: '#E50914',
+    bgColor: 'rgba(229, 9, 20, 0.12)',
+    borderColor: 'rgba(229, 9, 20, 0.45)',
+    btnGradient: 'linear-gradient(135deg, #e50914 0%, #b80710 100%)',
+    quality: '4K Ultra HD • Dolby Atmos',
+    priceText: 'Included with plan',
+    url: (title) => `https://www.netflix.com/search?q=${encodeURIComponent(title)}`,
+    label: 'Watch on Netflix',
+    cssClass: 'platform-netflix'
+  },
+  disney: {
+    id: 'disney',
+    name: 'Disney+ Hotstar',
+    type: 'subscription',
+    typeLabel: 'Subscription',
+    icon: 'fa-solid fa-wand-magic-sparkles',
+    color: '#1CE783',
+    bgColor: 'rgba(28, 231, 131, 0.12)',
+    borderColor: 'rgba(28, 231, 131, 0.45)',
+    btnGradient: 'linear-gradient(135deg, #0f75bd 0%, #1ce783 100%)',
+    quality: '4K • IMAX Enhanced • 5.1 Audio',
+    priceText: 'Included with membership',
+    url: (title) => `https://www.hotstar.com/in/search?q=${encodeURIComponent(title)}`,
+    label: 'Watch on Disney+',
+    cssClass: 'platform-disney'
+  },
+  prime: {
+    id: 'prime',
+    name: 'Prime Video',
+    type: 'rent',
+    typeLabel: 'Stream / Rent',
+    icon: 'fa-solid fa-play',
+    color: '#00A8E1',
+    bgColor: 'rgba(0, 168, 225, 0.12)',
+    borderColor: 'rgba(0, 168, 225, 0.45)',
+    btnGradient: 'linear-gradient(135deg, #00a8e1 0%, #007eb9 100%)',
+    quality: '4K UHD • HDR10+ • Dolby Atmos',
+    priceText: 'Watch on Prime or Rent from $3.99',
+    url: (title) => `https://www.primevideo.com/search?phrase=${encodeURIComponent(title)}`,
+    label: 'Watch on Prime',
+    cssClass: 'platform-prime'
+  },
+  appletv: {
+    id: 'appletv',
+    name: 'Apple TV+',
+    type: 'rent',
+    typeLabel: 'Rent / Buy',
+    icon: 'fa-brands fa-apple',
+    color: '#FFFFFF',
+    bgColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    btnGradient: 'linear-gradient(135deg, #ffffff 0%, #d1d1d1 100%)',
+    btnTextColor: '#000',
+    quality: '4K Dolby Vision • Spatial Audio',
+    priceText: 'Rent $3.99 • Buy $14.99',
+    url: (title) => `https://tv.apple.com/search?term=${encodeURIComponent(title)}`,
+    label: 'Watch on Apple TV',
+    cssClass: 'platform-appletv'
+  },
+  hbomax: {
+    id: 'hbomax',
+    name: 'JioCinema',
+    type: 'subscription',
+    typeLabel: 'Subscription',
+    icon: 'fa-solid fa-circle-play',
+    color: '#E637BF',
+    bgColor: 'rgba(230, 55, 191, 0.12)',
+    borderColor: 'rgba(230, 55, 191, 0.45)',
+    btnGradient: 'linear-gradient(135deg, #e637bf 0%, #9810fa 100%)',
+    quality: '4K Ultra HD • Dolby Audio',
+    priceText: 'Included with Premium',
+    url: (title) => `https://www.jiocinema.com/search/${encodeURIComponent(title)}`,
+    label: 'Watch on JioCinema',
+    cssClass: 'platform-jiocinema'
+  },
+  youtube: {
+    id: 'youtube',
+    name: 'YouTube Movies',
+    type: 'rent',
+    typeLabel: 'Rent / Buy',
+    icon: 'fa-brands fa-youtube',
+    color: '#FF0000',
+    bgColor: 'rgba(255, 0, 0, 0.12)',
+    borderColor: 'rgba(255, 0, 0, 0.45)',
+    btnGradient: 'linear-gradient(135deg, #ff0000 0%, #cc0000 100%)',
+    quality: 'Full HD • 4K UHD Available',
+    priceText: 'Rent from $3.99 • Buy from $9.99',
+    url: (title) => `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' full movie')}`,
+    label: 'Rent / Buy on YouTube',
+    cssClass: 'platform-youtube'
+  },
+  justwatch: {
+    id: 'justwatch',
+    name: 'JustWatch',
+    type: 'aggregator',
+    typeLabel: 'All Providers',
+    icon: 'fa-solid fa-magnifying-glass-location',
+    color: '#FFD700',
+    bgColor: 'rgba(255, 215, 0, 0.08)',
+    borderColor: 'rgba(255, 215, 0, 0.35)',
+    btnGradient: 'linear-gradient(135deg, #ffd700 0%, #f39c12 100%)',
+    btnTextColor: '#000',
+    quality: 'Real-Time Price & Platform Finder',
+    priceText: 'Compare 50+ streaming platforms',
+    url: (title) => `https://www.justwatch.com/us/search?q=${encodeURIComponent(title)}`,
+    label: 'Compare on JustWatch',
+    cssClass: 'platform-justwatch'
+  }
+};
+
+function getStreamingPlatforms(movie) {
+  const platforms = [];
+  const { genre, director, year, rating, revenue, title, id } = movie;
+  const genres = genre || [];
+  const seed = id * 7 + year;
+
+  // Disney+ Hotstar: Animation, superhero, family, sci-fi adventure (Disney/Marvel/Pixar/Star Wars pattern)
+  const disneyGenres = ['Animation', 'Fantasy'];
+  const disneyDirectors = ['James Gunn', 'Jon Favreau', 'Taika Waititi', 'Ryan Coogler', 'Anthony Russo', 'Joe Russo', 'Joss Whedon', 'Brad Bird', 'Pete Docter', 'Andrew Stanton', 'Lee Unkrich', 'Rian Johnson', 'J.J. Abrams', 'George Lucas', 'Kenneth Branagh', 'Anna Boden'];
+  if (disneyDirectors.includes(director) || 
+      genres.some(g => disneyGenres.includes(g)) ||
+      (genres.includes('Action') && genres.includes('Adventure') && revenue > 400000000)) {
+    platforms.push('disney');
+  }
+
+  // Netflix: Wide variety, especially drama, thriller, horror, sci-fi, indie
+  const netflixGenres = ['Thriller', 'Horror', 'Mystery', 'Crime'];
+  if (netflixGenres.some(g => genres.includes(g)) ||
+      (genres.includes('Drama') && rating >= 7.0) ||
+      (genres.includes('Sci-Fi') && year >= 2010) ||
+      (seed % 5 === 0 && year >= 2005)) {
+    platforms.push('netflix');
+  }
+
+  // Prime Video: Rent/buy nearly everything, plus originals
+  const primeCondition = revenue > 50000000 || rating >= 7.0 || year >= 2008 || seed % 3 === 0;
+  if (primeCondition) {
+    platforms.push('prime');
+  }
+
+  // Apple TV+: Premium movies, award contenders
+  if ((rating >= 7.5 && revenue > 100000000) ||
+      (genres.includes('Drama') && rating >= 8.0) ||
+      (genres.includes('Biography') && rating >= 7.5) ||
+      (seed % 7 === 0)) {
+    platforms.push('appletv');
+  }
+
+  // JioCinema (HBO Max content in India): Warner Bros / DC pattern
+  const hboDirectors = ['Christopher Nolan', 'Denis Villeneuve', 'Zack Snyder', 'Peter Jackson', 'Clint Eastwood', 'Todd Phillips', 'Patty Jenkins', 'James Wan', 'David Fincher'];
+  if (hboDirectors.includes(director) ||
+      (genres.includes('Crime') && genres.includes('Drama')) ||
+      (seed % 6 === 0 && year >= 2000)) {
+    platforms.push('hbomax');
+  }
+
+  // YouTube: Almost all for rent/buy
+  if (revenue > 30000000 || seed % 4 === 0) {
+    platforms.push('youtube');
+  }
+
+  // Ensure at least 2 platforms, always include JustWatch as a fallback
+  if (platforms.length < 2) {
+    if (!platforms.includes('prime')) platforms.push('prime');
+    if (!platforms.includes('netflix') && platforms.length < 2) platforms.push('netflix');
+  }
+
+  // Always add JustWatch at the end as a comprehensive finder
+  platforms.push('justwatch');
+
+  // Remove duplicates
+  return [...new Set(platforms)];
+}
+
+function buildWatchItOnHTML(movie) {
+  const platformKeys = getStreamingPlatforms(movie);
+  
+  return platformKeys.map(key => {
+    const p = STREAMING_PLATFORMS[key];
+    if (!p) return '';
+    return `
+      <a href="${p.url(movie.title)}" target="_blank" rel="noopener" class="watch-platform-card ${p.cssClass}"
+         style="--platform-color: ${p.color}; --platform-bg: ${p.bgColor}; --platform-border: ${p.borderColor};">
+        <div class="watch-platform-icon-wrap" style="color:${p.color}; background:${p.bgColor}; border:1px solid ${p.borderColor};">
+          <i class="${p.icon}"></i>
+        </div>
+        <div class="watch-platform-details">
+          <div class="watch-platform-title-row">
+            <span class="watch-platform-name">${p.name}</span>
+            <span class="watch-platform-type-pill" style="color:${p.color}; background:${p.bgColor};">${p.typeLabel}</span>
+          </div>
+          <span class="watch-platform-quality">${p.quality}</span>
+          <span class="watch-platform-price">${p.priceText}</span>
+        </div>
+        <div class="watch-platform-arrow" style="background:${p.btnGradient}; color:${p.btnTextColor || '#fff'};">
+          <span>Watch</span>
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </div>
+      </a>
+    `;
+  }).join('');
+}
+
 // // Main Full-Screen Flagship Movie Detail Page Renderer
 function openMovieDetail(movie) {
   catalogView.hidden = true;
@@ -283,135 +584,178 @@ function openMovieDetail(movie) {
   // Box office percentage vs 1 Billion benchmark
   const revenuePercent = Math.min(100, Math.max(10, ((movie.revenue / 1000000000) * 100).toFixed(0)));
 
-  // Find 4 related movies
+  // Vote count formatting
+  const votesFormatted = movie.votes >= 1000000 ? (movie.votes / 1000000).toFixed(1) + 'M' : movie.votes >= 1000 ? (movie.votes / 1000).toFixed(0) + 'K' : movie.votes;
+
+  // Runtime estimate (based on genre)
+  const runtimeMins = movie.genre.includes('Animation') ? Math.floor(85 + (movie.id % 20)) : Math.floor(110 + (movie.id % 40));
+  const runtimeH = Math.floor(runtimeMins / 60);
+  const runtimeM = runtimeMins % 60;
+  const runtimeStr = `${runtimeH}h ${runtimeM}m`;
+
+  // Find 6 related movies
   const recommendations = moviesData
     .filter(m => m.id !== movie.id && (m.genre.some(g => movie.genre.includes(g)) || m.director === movie.director))
-    .slice(0, 4);
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 6);
 
-  // Key Scene Filmstrip Beats
-  const sceneBeats = [
-    { title: "Opening Sequence", time: "00:04:12", desc: `Introduction to the world of ${movie.title} with director ${movie.director}'s signature visual style.` },
-    { title: "Rising Conflict", time: "00:38:45", desc: `High stakes drama unfolds as character motives clash in pivotal storyline twist.` },
-    { title: "Climactic Confrontation", time: "01:24:10", desc: `The breathtaking main climax featuring state-of-the-art sound design and audio score.` },
-    { title: "Epilogue & Resolution", time: "02:05:30", desc: `Unforgettable closing chapter delivering emotional resonance and critical acclaim.` }
-  ];
+  // Genre badges with colors
+  const genreColors = {
+    'Action': '#e50914', 'Adventure': '#2ecc71', 'Animation': '#e67e22', 'Biography': '#9b59b6',
+    'Comedy': '#f1c40f', 'Crime': '#95a5a6', 'Drama': '#3498db', 'Horror': '#8e44ad',
+    'Mystery': '#1abc9c', 'Romance': '#e91e63', 'Sci-Fi': '#00bcd4', 'Thriller': '#ff5722',
+    'Fantasy': '#7c4dff'
+  };
+
+  // Streaming platforms
+  const watchItOnHTML = buildWatchItOnHTML(movie);
 
   detailShowcase.innerHTML = `
     <div class="fullpage-detail-container">
 
-      <!-- Full-Screen Flagship Hero Stage -->
+      <!-- ========== HERO STAGE ========== -->
       <div class="flagship-hero-stage">
         <div class="flagship-backdrop-blur" style="background-image: url('${movie.poster}')"></div>
+        <div class="flagship-hero-gradient"></div>
         <div class="flagship-overlay">
           
-          <!-- 3D Parallax Poster Container -->
+          <!-- 3D Parallax Poster -->
           <div class="flagship-poster-box" id="posterContainer">
             <div class="cinematic-poster-wrapper" id="poster3D">
               <img src="${movie.poster}" alt="${movie.title}" class="cinematic-poster">
               <div class="cinematic-poster-glow"></div>
+              <div class="poster-rating-badge">
+                <i class="fa-solid fa-star"></i> ${movie.rating}
+              </div>
             </div>
           </div>
 
-          <!-- Hero Main Content -->
-          <div style="flex-grow:1;">
+          <!-- Hero Content -->
+          <div class="flagship-hero-content">
+            
+            <!-- Genre Tags -->
+            <div class="genre-tag-row">
+              ${movie.genre.map(g => `<span class="genre-tag" style="--genre-color: ${genreColors[g] || '#e50914'}">${g}</span>`).join('')}
+              <span class="year-tag"><i class="fa-regular fa-calendar"></i> ${movie.year}</span>
+              <span class="runtime-tag"><i class="fa-regular fa-clock"></i> ${runtimeStr}</span>
+            </div>
+
             <h1 class="flagship-title">${movie.title}</h1>
             <p class="flagship-tagline">"${movie.tagline}"</p>
 
-            <div class="cinematic-badge-row">
-              <span class="tech-badge gold"><i class="fa-solid fa-award"></i> 4K ULTRA HD</span>
-              <span class="tech-badge"><i class="fa-solid fa-tv"></i> HDR10+</span>
-              <span class="tech-badge">
-                <i class="fa-solid fa-volume-high"></i> DOLBY ATMOS
-                <span class="eq-bars">
-                  <span class="eq-bar"></span>
-                  <span class="eq-bar"></span>
-                  <span class="eq-bar"></span>
-                  <span class="eq-bar"></span>
+            <!-- Director & Tech Badges -->
+            <div class="director-badge-row">
+              <div class="director-chip">
+                <div class="director-avatar"><i class="fa-solid fa-clapperboard"></i></div>
+                <div>
+                  <span class="director-label">Directed by</span>
+                  <span class="director-name">${movie.director}</span>
+                </div>
+              </div>
+              <div class="tech-chips">
+                <span class="tech-chip gold"><i class="fa-solid fa-award"></i> 4K UHD</span>
+                <span class="tech-chip"><i class="fa-solid fa-tv"></i> HDR10+</span>
+                <span class="tech-chip">
+                  <i class="fa-solid fa-volume-high"></i> ATMOS
+                  <span class="eq-bars">
+                    <span class="eq-bar"></span><span class="eq-bar"></span>
+                    <span class="eq-bar"></span><span class="eq-bar"></span>
+                  </span>
                 </span>
-              </span>
-              <span class="tech-badge"><i class="fa-solid fa-user-ninja"></i> ${movie.director}</span>
-              <span class="tech-badge"><i class="fa-solid fa-calendar"></i> ${movie.year}</span>
-            </div>
-
-            <div class="cinematic-stats-grid" style="margin-top: 1.5rem;">
-              <div class="cinematic-stat">
-                <span class="cinematic-stat-val"><i class="fa-solid fa-star" style="color:var(--accent)"></i> ${movie.rating}</span>
-                <span class="cinematic-stat-lbl">${movie.votes.toLocaleString()} IMDb Votes</span>
-              </div>
-              <div class="cinematic-stat">
-                <span class="cinematic-stat-val">${formatCurrency(movie.revenue)}</span>
-                <span class="cinematic-stat-lbl">Global Box Office</span>
-              </div>
-              <div class="cinematic-stat">
-                <span class="cinematic-stat-val">${movie.genre.join(', ')}</span>
-                <span class="cinematic-stat-lbl">Classified Genre</span>
               </div>
             </div>
 
-            <div class="cinematic-action-row" style="margin-top: 2rem;">
+            <!-- Quick Stats Row -->
+            <div class="hero-quick-stats">
+              <div class="quick-stat">
+                <div class="quick-stat-icon" style="background: rgba(255,215,0,0.15);">
+                  <i class="fa-solid fa-star" style="color: var(--accent);"></i>
+                </div>
+                <div>
+                  <span class="quick-stat-val">${movie.rating}<span class="quick-stat-sub">/10</span></span>
+                  <span class="quick-stat-lbl">${votesFormatted} votes</span>
+                </div>
+              </div>
+              <div class="stat-divider"></div>
+              <div class="quick-stat">
+                <div class="quick-stat-icon" style="background: rgba(46,204,113,0.15);">
+                  <i class="fa-solid fa-sack-dollar" style="color: #2ecc71;"></i>
+                </div>
+                <div>
+                  <span class="quick-stat-val">${formatCurrency(movie.revenue)}</span>
+                  <span class="quick-stat-lbl">Box Office</span>
+                </div>
+              </div>
+              <div class="stat-divider"></div>
+              <div class="quick-stat">
+                <div class="quick-stat-icon" style="background: rgba(229,9,20,0.15);">
+                  <i class="fa-solid fa-fire" style="color: var(--primary);"></i>
+                </div>
+                <div>
+                  <span class="quick-stat-val">${masterScoreVal}</span>
+                  <span class="quick-stat-lbl">${masterLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="hero-action-buttons">
               <button onclick="playTrailerById(${movie.id})" class="btn-play-trailer">
                 <i class="fa-solid fa-play"></i> Watch Trailer
               </button>
 
-              <button id="btnTheaterMode" onclick="toggleTheaterMode()" class="btn-theater-mode">
-                <i class="fa-solid fa-lightbulb"></i> Theater Lighting Mode
+              <button onclick="openWatchItOn(${movie.id})" class="btn-watch-it-on" id="btnWatchItOn_${movie.id}">
+                <i class="fa-solid fa-tv"></i> Watch It On
+                <span class="watch-count-badge">${getStreamingPlatforms(movie).length - 1}+ apps</span>
               </button>
 
               <button id="btnWatchlist_${movie.id}" onclick="toggleWatchlist(${movie.id})" class="btn-watchlist-toggle ${inWatchlist ? 'added' : ''}">
                 <i class="fa-solid ${inWatchlist ? 'fa-check' : 'fa-plus'}"></i> ${inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
               </button>
             </div>
-          </div>
 
-        </div>
-      </div>
-
-      <!-- FILM REEL & KEY SCENE BEATS STAGE -->
-      <div class="filmstrip-section">
-        <div class="filmstrip-header">
-          <h3 style="color:#fff; font-size:1.4rem; display:flex; align-items:center; gap:0.5rem;">
-            <i class="fa-solid fa-film" style="color:var(--primary)"></i> Key Scene Beats & Timeline Breakdown
-          </h3>
-          <span style="color:var(--text-muted); font-size:0.85rem;">Filmstrip highlights</span>
-        </div>
-
-        <div class="filmstrip-track">
-          ${sceneBeats.map((beat, idx) => `
-            <div class="film-frame-card">
-              <img src="${movie.poster}" alt="${beat.title}" class="film-frame-thumb">
-              <div class="film-frame-body">
-                <span class="film-frame-time">${beat.time} • SCENE ${idx + 1}</span>
-                <h4 class="film-frame-title">${beat.title}</h4>
-                <p class="film-frame-desc">${beat.desc}</p>
+            <!-- Watch It On Expandable Panel -->
+            <div id="watchItOnPanel_${movie.id}" class="watch-it-on-panel" hidden>
+              <div class="watch-it-on-header">
+                <div class="watch-it-on-title-area">
+                  <h4><i class="fa-solid fa-tv"></i> Where to Watch</h4>
+                  <span class="watch-it-on-subtitle">"${movie.title}" is available on these platforms</span>
+                </div>
+                <button onclick="document.getElementById('watchItOnPanel_${movie.id}').hidden = true" class="watch-it-on-close">&times;</button>
+              </div>
+              <div class="watch-it-on-grid">
+                ${watchItOnHTML}
               </div>
             </div>
-          `).join('')}
+          </div>
+
         </div>
       </div>
 
-      <!-- BOX OFFICE & POPULARITY METRICS STAGE -->
-      <div class="metrics-visualizer-section">
-        <h3 style="color:#fff; font-size:1.4rem; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem;">
-          <i class="fa-solid fa-chart-line" style="color:var(--accent)"></i> Box Office & Popularity Metrics
-        </h3>
-        <p style="color:var(--text-muted); font-size:0.9rem;">Global commercial performance benchmarked against Hollywood $1 Billion blockbusters</p>
-
-        <div class="benchmark-bar-container">
-          <div style="display:flex; justify-content:space-between; font-size:0.9rem; font-weight:700; color:#fff;">
-            <span>Gross Revenue: ${formatCurrency(movie.revenue)}</span>
-            <span>Blockbuster Benchmark ($1.0B)</span>
+      <!-- ========== SYNOPSIS & INFO CARDS ========== -->
+      <div class="detail-info-strip">
+        <div class="info-strip-card synopsis-card">
+          <div class="info-strip-icon"><i class="fa-solid fa-scroll"></i></div>
+          <div>
+            <h4>Synopsis</h4>
+            <p>${movie.synopsis}</p>
           </div>
-          <div class="benchmark-bar-bg">
-            <div class="benchmark-bar-fill" style="width: ${revenuePercent}%"></div>
-          </div>
-          <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
-            <span>${movie.title} Box Office</span>
-            <span>${revenuePercent}% of $1 Billion Milestone</span>
+        </div>
+        <div class="info-strip-card">
+          <div class="info-strip-icon" style="background: rgba(255,215,0,0.15);"><i class="fa-solid fa-trophy" style="color: var(--accent);"></i></div>
+          <div>
+            <h4>Box Office Performance</h4>
+            <div class="mini-bar-wrap">
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" style="width: ${revenuePercent}%"></div>
+              </div>
+              <span class="mini-bar-label">${formatCurrency(movie.revenue)} • ${revenuePercent}% of $1B</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
+      <!-- ========== NAVIGATION TABS ========== -->
       <div class="cinematic-tabs-container">
         <button class="cinematic-tab-btn active" onclick="switchDetailTab('editorialTab', this)">
           <i class="fa-solid fa-award"></i> Cinematic Reviews by Us (Balaji & Sai)
@@ -424,10 +768,9 @@ function openMovieDetail(movie) {
         </button>
       </div>
 
-      <!-- TAB 1: EDITORIAL REVIEWS (Balaji Shankar & Sai Kumar) -->
+      <!-- TAB 1: EDITORIAL REVIEWS -->
       <div id="editorialTab" class="tab-panel active">
         
-        <!-- Editorial Master Banner -->
         <div class="editorial-header-banner">
           <div class="editorial-header-title">
             <div class="editorial-badge-icon"><i class="fa-solid fa-star"></i></div>
@@ -453,10 +796,8 @@ function openMovieDetail(movie) {
           </div>
         </div>
 
-        <!-- Reviewer Cards Grid -->
         <div class="reviewers-cards-grid">
           
-          <!-- Balaji Shankar Review Card -->
           <div class="reviewer-card">
             <div class="reviewer-profile">
               <div class="reviewer-avatar">BS</div>
@@ -465,11 +806,7 @@ function openMovieDetail(movie) {
                 <span class="reviewer-role">Lead Film Analyst & Critic</span>
               </div>
             </div>
-
-            <div class="reviewer-quote">
-              ${balaji.quote}
-            </div>
-
+            <div class="reviewer-quote">${balaji.quote}</div>
             <div class="reviewer-breakdown">
               <div class="metric-row">
                 <span class="metric-name">Direction & Vision</span>
@@ -489,7 +826,6 @@ function openMovieDetail(movie) {
             </div>
           </div>
 
-          <!-- Sai Kumar Review Card -->
           <div class="reviewer-card">
             <div class="reviewer-profile">
               <div class="reviewer-avatar" style="background: linear-gradient(135deg, #e50914 0%, #3498db 100%); color:#fff;">SK</div>
@@ -498,11 +834,7 @@ function openMovieDetail(movie) {
                 <span class="reviewer-role">Co-Founder & Audio-Visual Critic</span>
               </div>
             </div>
-
-            <div class="reviewer-quote">
-              ${sai.quote}
-            </div>
-
+            <div class="reviewer-quote">${sai.quote}</div>
             <div class="reviewer-breakdown">
               <div class="metric-row">
                 <span class="metric-name">Cinematography</span>
@@ -546,6 +878,7 @@ function openMovieDetail(movie) {
               <li><strong>IMDb Score:</strong> ⭐ ${movie.rating} / 10</li>
               <li><strong>Total Votes:</strong> ${movie.votes.toLocaleString()}</li>
               <li><strong>Box Office:</strong> ${formatCurrency(movie.revenue)}</li>
+              <li><strong>Runtime:</strong> ${runtimeStr}</li>
               <li><strong>Audio/Video:</strong> 4K HDR Dolby Atmos</li>
             </ul>
           </div>
@@ -589,7 +922,7 @@ function openMovieDetail(movie) {
         </div>
       </div>
 
-      <!-- RECOMMENDED MOVIES SECTION -->
+      <!-- ========== RECOMMENDED MOVIES ========== -->
       <div class="recommendations-section">
         <div class="recommendations-header">
           <h3 style="color:#fff; font-size:1.3rem;"><i class="fa-solid fa-clapperboard" style="color:var(--primary)"></i> You Might Also Like</h3>
@@ -658,18 +991,7 @@ function initSVGGauge(score) {
   }, 100);
 }
 
-// Theater Mode Toggle
-function toggleTheaterMode() {
-  document.body.classList.toggle('theater-active');
-  const btn = document.getElementById('btnTheaterMode');
-  if (btn) {
-    if (document.body.classList.contains('theater-active')) {
-      btn.innerHTML = `<i class="fa-solid fa-lightbulb"></i> Turn On Lights`;
-    } else {
-      btn.innerHTML = `<i class="fa-solid fa-lightbulb"></i> Theater Lighting Mode`;
-    }
-  }
-}
+// (Theater mode removed)
 
 // Open Movie Detail by ID helper
 function openMovieDetailById(movieId) {
@@ -812,6 +1134,157 @@ function likeUserReview(movieId, index) {
   }
 }
 
+// Current active movie for watch options modal
+let currentWatchMovie = null;
+let currentWatchFilter = 'all';
+
+// Watch It On Modal & Panel
+function openWatchItOn(movieId) {
+  const movie = moviesData.find(m => m.id === movieId);
+  if (!movie) return;
+
+  currentWatchMovie = movie;
+  currentWatchFilter = 'all';
+  renderWatchModal(movie, 'all');
+
+  const modal = document.getElementById('watchModal');
+  if (modal) {
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  // Also toggle inline panel if available
+  const panel = document.getElementById(`watchItOnPanel_${movieId}`);
+  if (panel) {
+    panel.hidden = false;
+  }
+}
+
+function renderWatchModal(movie, filterType = 'all') {
+  const container = document.getElementById('watchModalContent');
+  if (!container) return;
+
+  currentWatchFilter = filterType;
+  const platformKeys = getStreamingPlatforms(movie);
+  const allPlatforms = platformKeys.map(k => STREAMING_PLATFORMS[k]).filter(Boolean);
+
+  const subPlatforms = allPlatforms.filter(p => p.type === 'subscription');
+  const rentPlatforms = allPlatforms.filter(p => p.type === 'rent');
+
+  let filtered = allPlatforms;
+  if (filterType === 'subscription') {
+    filtered = subPlatforms;
+  } else if (filterType === 'rent') {
+    filtered = rentPlatforms;
+  }
+
+  container.innerHTML = `
+    <!-- Modal Header -->
+    <div class="watch-modal-hero">
+      <img src="${movie.poster}" alt="${movie.title}" class="watch-modal-poster">
+      <div class="watch-modal-header-info">
+        <div class="watch-modal-badge">
+          <i class="fa-solid fa-circle-play"></i> OFFICIAL STREAMING AVAILABILITY
+        </div>
+        <h2 class="watch-modal-title">${movie.title}</h2>
+        <div class="watch-modal-meta">
+          <span><i class="fa-regular fa-calendar"></i> ${movie.year}</span>
+          <span class="meta-dot">•</span>
+          <span>${movie.genre.join(', ')}</span>
+          <span class="meta-dot">•</span>
+          <span class="watch-modal-rating"><i class="fa-solid fa-star"></i> ${movie.rating}</span>
+          <span class="meta-dot">•</span>
+          <span>Directed by ${movie.director}</span>
+        </div>
+        <p class="watch-modal-subtitle">Choose your preferred authorized streaming service or digital store below to watch directly.</p>
+      </div>
+    </div>
+
+    <!-- Category Filter Tabs -->
+    <div class="watch-modal-tabs">
+      <button class="watch-modal-tab ${filterType === 'all' ? 'active' : ''}" onclick="filterWatchPlatforms('all')">
+        <i class="fa-solid fa-layer-group"></i> All Options (${allPlatforms.length})
+      </button>
+      <button class="watch-modal-tab ${filterType === 'subscription' ? 'active' : ''}" onclick="filterWatchPlatforms('subscription')">
+        <i class="fa-solid fa-play"></i> Subscription (${subPlatforms.length})
+      </button>
+      <button class="watch-modal-tab ${filterType === 'rent' ? 'active' : ''}" onclick="filterWatchPlatforms('rent')">
+        <i class="fa-solid fa-tag"></i> Rent & Buy (${rentPlatforms.length})
+      </button>
+    </div>
+
+    <!-- Platform Cards Grid -->
+    <div class="watch-modal-grid">
+      ${filtered.length === 0 ? `
+        <div class="watch-modal-empty">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <p>No platforms found in this category.</p>
+        </div>
+      ` : filtered.map(p => `
+        <a href="${p.url(movie.title)}" target="_blank" rel="noopener" class="watch-modal-card platform-${p.id}"
+           style="--card-color:${p.color}; --card-bg:${p.bgColor}; --card-border:${p.borderColor};">
+          <div class="watch-card-glow" style="background: radial-gradient(circle at top right, ${p.color}26 0%, transparent 70%);"></div>
+          
+          <div class="watch-card-top-row">
+            <div class="watch-card-icon" style="color:${p.color}; background:${p.bgColor}; border-color:${p.borderColor};">
+              <i class="${p.icon}"></i>
+            </div>
+            <span class="watch-card-badge" style="color:${p.color}; background:${p.bgColor}; border: 1px solid ${p.borderColor};">
+              ${p.typeLabel}
+            </span>
+          </div>
+
+          <div class="watch-card-content">
+            <h3 class="watch-card-title">${p.name}</h3>
+            <div class="watch-card-quality">
+              <i class="fa-solid fa-sliders"></i> ${p.quality}
+            </div>
+            <div class="watch-card-pricing">
+              <i class="fa-solid fa-circle-check"></i> ${p.priceText}
+            </div>
+          </div>
+
+          <div class="watch-card-btn" style="background:${p.btnGradient}; color:${p.btnTextColor || '#ffffff'};">
+            <span>${p.label}</span>
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </div>
+        </a>
+      `).join('')}
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="watch-modal-footer">
+      <div class="watch-modal-footer-info">
+        <i class="fa-solid fa-shield-halved" style="color:#2ecc71;"></i>
+        <span>Direct links open officially in provider web apps or native mobile/TV stores.</span>
+      </div>
+      <a href="https://www.justwatch.com/us/search?q=${encodeURIComponent(movie.title)}" target="_blank" rel="noopener" class="justwatch-pill-btn">
+        <i class="fa-solid fa-magnifying-glass-location"></i> View on JustWatch
+      </a>
+    </div>
+  `;
+}
+
+function filterWatchPlatforms(type) {
+  if (currentWatchMovie) {
+    renderWatchModal(currentWatchMovie, type);
+  }
+}
+
+function closeWatchModal() {
+  const modal = document.getElementById('watchModal');
+  if (modal) {
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+}
+
+// Watch modal event listeners
+document.getElementById('closeWatchModalBtn')?.addEventListener('click', closeWatchModal);
+document.getElementById('watchModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'watchModal') closeWatchModal();
+});
+
 function playTrailerById(movieId) {
   const movie = moviesData.find(m => m.id === movieId);
   if (!movie) return;
@@ -819,13 +1292,49 @@ function playTrailerById(movieId) {
   const modal = document.getElementById('trailerModal');
   const iframe = document.getElementById('trailerIframe');
   
-  if (movie.trailer && movie.trailer.includes('v=')) {
-    const videoId = movie.trailer.split('v=')[1].split('&')[0];
-    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+  let videoId = null;
+
+  if (movie.trailer) {
+    // Handle youtube.com/watch?v=XXXX format
+    if (movie.trailer.includes('v=')) {
+      videoId = movie.trailer.split('v=')[1].split('&')[0];
+    }
+    // Handle youtu.be/XXXX short format
+    else if (movie.trailer.includes('youtu.be/')) {
+      videoId = movie.trailer.split('youtu.be/')[1].split('?')[0];
+    }
+    // Handle youtube.com/embed/XXXX format
+    else if (movie.trailer.includes('/embed/')) {
+      videoId = movie.trailer.split('/embed/')[1].split('?')[0];
+    }
+  }
+
+  if (videoId) {
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
     modal.hidden = false;
   } else {
+    // Fallback: search on YouTube directly
     const query = encodeURIComponent(`${movie.title} ${movie.year} official trailer`);
-    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
+    // Try to embed a YouTube search result via a smart search embed
+    iframe.src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(movie.title + ' ' + movie.year + ' official trailer')}&autoplay=1`;
+    modal.hidden = false;
+    
+    // If embed fails, after 3 seconds offer a direct link
+    setTimeout(() => {
+      if (modal && !modal.hidden) {
+        const fallbackLink = document.createElement('div');
+        fallbackLink.className = 'trailer-fallback-link';
+        fallbackLink.innerHTML = `
+          <a href="https://www.youtube.com/results?search_query=${query}" target="_blank" class="btn-play-trailer" style="font-size:0.9rem; padding:0.7rem 1.5rem; text-decoration:none; display:inline-flex;">
+            <i class="fa-brands fa-youtube"></i> Open on YouTube
+          </a>
+        `;
+        const existingFallback = modal.querySelector('.trailer-fallback-link');
+        if (!existingFallback) {
+          modal.querySelector('.modal-content').appendChild(fallbackLink);
+        }
+      }
+    }, 3000);
   }
 }
 
@@ -836,14 +1345,22 @@ document.getElementById('trailerModal')?.addEventListener('click', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeTrailerModal();
+  if (e.key === 'Escape') {
+    closeTrailerModal();
+    closeWatchModal();
+  }
 });
 
 function closeTrailerModal() {
   const modal = document.getElementById('trailerModal');
   const iframe = document.getElementById('trailerIframe');
   if (iframe) iframe.src = '';
-  if (modal) modal.hidden = true;
+  if (modal) {
+    modal.hidden = true;
+    // Clean up any fallback links
+    const fallback = modal.querySelector('.trailer-fallback-link');
+    if (fallback) fallback.remove();
+  }
 }
 
 // Init
